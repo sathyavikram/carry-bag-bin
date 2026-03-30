@@ -18,14 +18,23 @@ EXPORT_STEP = os.path.join(EXPORT_BASE, "part_03_top_lid.step")
 EXPORT_STL = os.path.join(EXPORT_BASE, "part_03_top_lid.stl")
 
 def create_rounded_box(width, length, height, radius):
-    p1 = App.Vector(-width/2, -length/2, 0)
-    p2 = App.Vector(width/2, -length/2, 0)
-    p3 = App.Vector(width/2, length/2, 0)
-    p4 = App.Vector(-width/2, length/2, 0)
-    poly = Part.makePolygon([p1, p2, p3, p4, p1])
+    fillet_r = min(10.0 * config.SCALE, radius * 0.5) if radius > 0 else 0
+    chamfer_r = radius
+    w2 = width/2 + chamfer_r
+    l2 = length/2 + chamfer_r
+    p1 = App.Vector(-w2 + chamfer_r, -l2, 0)
+    p2 = App.Vector(w2 - chamfer_r, -l2, 0)
+    p3 = App.Vector(w2, -l2 + chamfer_r, 0)
+    p4 = App.Vector(w2, l2 - chamfer_r, 0)
+    p5 = App.Vector(w2 - chamfer_r, l2, 0)
+    p6 = App.Vector(-w2 + chamfer_r, l2, 0)
+    p7 = App.Vector(-w2, l2 - chamfer_r, 0)
+    p8 = App.Vector(-w2, -l2 + chamfer_r, 0)
+    poly = Part.makePolygon([p1, p2, p3, p4, p5, p6, p7, p8, p1])
     face = Part.Face(poly)
-    if radius > 0:
-        face = face.makeOffset2D(radius, join=2)
+    if fillet_r > 0:
+        face = face.makeOffset2D(-fillet_r, join=1)
+        face = face.makeOffset2D(fillet_r, join=0)
     prism = face.extrude(App.Vector(0,0,height))
     return prism
 
@@ -36,9 +45,34 @@ def construct_lid():
     # Base weighted lid part
     lid = create_rounded_box(outer_w, outer_l, config.LID_THICKNESS, max(0.1, config.CORNER_RADIUS))
     
-    # Handle protrusion for easy grabbing
-    handle = create_rounded_box(30*config.SCALE, 10*config.SCALE, 10*config.SCALE, 2*config.SCALE)
-    handle.translate(App.Vector(0, -outer_l/2 + 15*config.SCALE, config.LID_THICKNESS))
+    # Stylish Modern Handle
+    # A wide, gently sloped front lip that provides a large, easy-to-grab under-surface
+    handle_w = 100.0 * config.SCALE
+    handle_l = 20.0 * config.SCALE
+    handle_h = 10.0 * config.SCALE
+    
+    # Create the base block for the handle
+    handle_base = create_rounded_box(handle_w, handle_l, handle_h, 5.0 * config.SCALE)
+    
+    # Slant the back side of the handle using a cut for a sleek, ergonomic feel
+    cut_box = Part.makeBox(handle_w + 10, handle_l + 10, handle_h + 10)
+    cut_box.rotate(App.Vector(0,0,0), App.Vector(1,0,0), 30) # 30 degree ergonomic slope
+    cut_box.translate(App.Vector(-(handle_w+10)/2, handle_l/2 - 10*config.SCALE, 5.0*config.SCALE))
+    handle = handle_base.cut(cut_box)
+    
+    # Fillet the sharp edge of the handle cut
+    try:
+        edges_to_fillet_h = []
+        for edge in handle.Edges:
+            if edge.BoundBox.ZLength < 0.1 and edge.BoundBox.ZMax > handle_h - 1:
+                edges_to_fillet_h.append(edge)
+        if edges_to_fillet_h:
+            handle = handle.makeFillet(2.0, edges_to_fillet_h)
+    except:
+        pass
+
+    # Position handle at the correct location on the lid
+    handle.translate(App.Vector(0, -outer_l/2 + 2.0*config.SCALE, config.LID_THICKNESS))
     
     lid = lid.fuse(handle)
     
@@ -59,6 +93,42 @@ def construct_lid():
     lip.translate(App.Vector(0, 0, -lip_h))
     
     lid = lid.fuse(lip)
+    
+    # Hinge mechanism
+    def make_lid_hinge(width, y_start, y_center):
+        z_drop = -6.0 * config.SCALE
+        p1 = App.Vector(-width/2, y_start, 0)
+        p2 = App.Vector(width/2, y_start, 0)
+        p3 = App.Vector(width/2, y_start, config.LID_THICKNESS)
+        p4 = App.Vector(-width/2, y_start, config.LID_THICKNESS)
+        f_start = Part.Face(Part.makePolygon([p1, p2, p3, p4, p1]))
+        
+        cyl_r = 5.0 * config.SCALE
+        p1e = App.Vector(-width/2, y_center, z_drop - cyl_r)
+        p2e = App.Vector(width/2, y_center, z_drop - cyl_r)
+        p3e = App.Vector(width/2, y_center, z_drop + cyl_r)
+        p4e = App.Vector(-width/2, y_center, z_drop + cyl_r)
+        f_end = Part.Face(Part.makePolygon([p1e, p2e, p3e, p4e, p1e]))
+        
+        loft = Part.makeLoft([f_start.Wires[0], f_end.Wires[0]], True)
+        
+        cyl = Part.makeCylinder(cyl_r, width)
+        cyl.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
+        cyl.translate(App.Vector(-width/2, y_center, z_drop))
+        
+        pin_width = width + 10.0 * config.SCALE
+        pin = Part.makeCylinder(config.HINGE_PIN_RADIUS, pin_width)
+        pin.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
+        pin.translate(App.Vector(-pin_width/2, y_center, z_drop))
+        
+        return loft.fuse([cyl, pin])
+
+    h_width = 79.0 * config.SCALE
+    h_start = (outer_l / 2.0) + config.CORNER_RADIUS - 2.0 * config.SCALE
+    h_center = (config.LENGTH_TOP / 2.0) + config.CORNER_RADIUS + 18.0 * config.SCALE
+    
+    lid_hinge = make_lid_hinge(h_width, h_start, h_center)
+    lid = lid.fuse(lid_hinge)
     
     try:
         edges_to_fillet = []

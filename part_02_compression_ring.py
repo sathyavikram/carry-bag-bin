@@ -18,14 +18,23 @@ EXPORT_STEP = os.path.join(EXPORT_BASE, "part_02_compression_ring.step")
 EXPORT_STL = os.path.join(EXPORT_BASE, "part_02_compression_ring.stl")
 
 def create_rounded_box(width, length, height, radius):
-    p1 = App.Vector(-width/2, -length/2, 0)
-    p2 = App.Vector(width/2, -length/2, 0)
-    p3 = App.Vector(width/2, length/2, 0)
-    p4 = App.Vector(-width/2, length/2, 0)
-    poly = Part.makePolygon([p1, p2, p3, p4, p1])
+    fillet_r = min(10.0 * config.SCALE, radius * 0.5) if radius > 0 else 0
+    chamfer_r = radius
+    w2 = width/2 + chamfer_r
+    l2 = length/2 + chamfer_r
+    p1 = App.Vector(-w2 + chamfer_r, -l2, 0)
+    p2 = App.Vector(w2 - chamfer_r, -l2, 0)
+    p3 = App.Vector(w2, -l2 + chamfer_r, 0)
+    p4 = App.Vector(w2, l2 - chamfer_r, 0)
+    p5 = App.Vector(w2 - chamfer_r, l2, 0)
+    p6 = App.Vector(-w2 + chamfer_r, l2, 0)
+    p7 = App.Vector(-w2, l2 - chamfer_r, 0)
+    p8 = App.Vector(-w2, -l2 + chamfer_r, 0)
+    poly = Part.makePolygon([p1, p2, p3, p4, p5, p6, p7, p8, p1])
     face = Part.Face(poly)
-    if radius > 0:
-        face = face.makeOffset2D(radius, join=2)
+    if fillet_r > 0:
+        face = face.makeOffset2D(-fillet_r, join=1)
+        face = face.makeOffset2D(fillet_r, join=0)
     prism = face.extrude(App.Vector(0,0,height))
     return prism
 
@@ -50,62 +59,40 @@ def construct_compression_ring():
 
     outer_rad = max(0.1, config.CORNER_RADIUS-config.WALL_THICKNESS)
     outer_solid = create_rounded_box(ring_w_outer, ring_l_outer, config.RING_HEIGHT, outer_rad)
-    inner_solid = create_rounded_box(ring_w_inner, ring_l_inner, config.RING_HEIGHT, max(0.1, config.CORNER_RADIUS-2*config.WALL_THICKNESS))
+    inner_rad = max(0.1, config.CORNER_RADIUS-2*config.WALL_THICKNESS)
+    inner_solid = create_rounded_box(ring_w_inner, ring_l_inner, config.RING_HEIGHT, inner_rad)
     
     ring = outer_solid.cut(inner_solid)
     
-    # Add snap-tabs on the outer edge (middle of all 4 sides)
-    # We add a chamfer to the bottom of the tabs for easier insertion
-    
-    def make_chamfered_tab(width, depth, height):
-        # Construct a prism with a chamfered bottom-outer corner
-        # Profile in XZ plane (at Y=0)
-        # X goes from 0 to depth
-        # Z goes from 0 to height
-        # Chamfer at corner (X=depth, Z=0)
-        chamfer = depth * 0.6
-        if chamfer > height: chamfer = height - 0.1
-        
-        # Points for the side profile
-        p1 = App.Vector(0, 0, 0)
-        p2 = App.Vector(depth - chamfer, 0, 0)
-        p3 = App.Vector(depth, 0, chamfer) # Chamfer slope
-        p4 = App.Vector(depth, 0, height)
-        p5 = App.Vector(0, 0, height)
-        
-        # Create polygon and face
-        poly = Part.makePolygon([p1, p2, p3, p4, p5, p1])
-        face = Part.Face(poly)
-        
-        # Extrude in Y direction to create the width
-        tab = face.extrude(App.Vector(0, width, 0))
-        
-        return tab
+    # --- Add hinge pin for snapping the ring to the bin ---
+    y_max_out = ring_l_outer / 2.0 + outer_rad
+    y_max_in = ring_l_inner / 2.0 + inner_rad
+    rear_y_center = (y_max_out + y_max_in) / 2.0
 
-    # Adjust tab positions by outer_rad to place them on the actual outer surface
-    # Right Tab (+X)
-    tab1 = make_chamfered_tab(config.SNAP_TAB_WIDTH, config.SNAP_TAB_DEPTH, config.RING_HEIGHT/2.0)
-    tab1.translate(App.Vector(ring_w_outer/2 + outer_rad, -config.SNAP_TAB_WIDTH/2, config.RING_HEIGHT/4.0))
+    notch_w = 40.0 * config.SCALE
+    notch = Part.makeBox(notch_w, 30.0 * config.SCALE, config.RING_HEIGHT + 10)
+    notch.translate(App.Vector(-notch_w/2, rear_y_center - 10.0 * config.SCALE, -5))
+    ring = ring.cut(notch)
     
-    # Left Tab (-X)
-    tab2 = make_chamfered_tab(config.SNAP_TAB_WIDTH, config.SNAP_TAB_DEPTH, config.RING_HEIGHT/2.0)
-    tab2.rotate(App.Vector(0,0,0), App.Vector(0,0,1), 180)
-    tab2.translate(App.Vector(-(ring_w_outer/2 + outer_rad), config.SNAP_TAB_WIDTH/2, config.RING_HEIGHT/4.0))
+    pin_radius = 2.5 * config.SCALE
+    pin = Part.makeCylinder(pin_radius, notch_w)
+    pin.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
+    pin.translate(App.Vector(-notch_w/2, rear_y_center, config.RING_HEIGHT / 2.0))
     
-    # Back Tab (+Y)
-    tab3 = make_chamfered_tab(config.SNAP_TAB_WIDTH, config.SNAP_TAB_DEPTH, config.RING_HEIGHT/2.0)
-    tab3.rotate(App.Vector(0,0,0), App.Vector(0,0,1), 90)
-    tab3.translate(App.Vector(config.SNAP_TAB_WIDTH/2, ring_l_outer/2 + outer_rad, config.RING_HEIGHT/4.0))
+    ring = ring.fuse(pin)
     
-    # Front Tab (-Y)
-    tab4 = make_chamfered_tab(config.SNAP_TAB_WIDTH, config.SNAP_TAB_DEPTH, config.RING_HEIGHT/2.0)
-    tab4.rotate(App.Vector(0,0,0), App.Vector(0,0,1), -90)
-    tab4.translate(App.Vector(-config.SNAP_TAB_WIDTH/2, -(ring_l_outer/2 + outer_rad), config.RING_HEIGHT/4.0))
-    
-    ring = ring.fuse([tab1, tab2, tab3, tab4])
-    
+    # --- Add front thumb tab for easy snapping ---
+    front_y_center = -rear_y_center
+    tab_w = 40.0 * config.SCALE
+    tab_l = 15.0 * config.SCALE
+    tab = Part.makeBox(tab_w, tab_l, config.RING_HEIGHT)
+    tab.translate(App.Vector(-tab_w/2, front_y_center, 0))
+    ring = ring.fuse(tab)
+    # -----------------------------------------------------
+
     try:
         edges_to_fillet = []
+
         for edge in ring.Edges:
             z_mid = (edge.BoundBox.ZMin + edge.BoundBox.ZMax) / 2.0
             # Fillet horizontal edges only

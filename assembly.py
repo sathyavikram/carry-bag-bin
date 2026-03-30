@@ -67,15 +67,15 @@ def main():
     # Ensure export directories exist
     os.makedirs(EXPORT_BASE, exist_ok=True)
 
-    # And final fused assembly into exports
-    assembly_shape = bin_body.fuse([ring, lid])
-    assembly_shape.exportStep(os.path.join(EXPORT_BASE, "assembly.step"))
-    assembly_shape.exportStl(os.path.join(EXPORT_BASE, "assembly.stl"))
+    # Export step containing distinct objects instead of fusing them
+    import Import
+    Import.export([body1, body2, body3], os.path.join(EXPORT_BASE, "assembly.step"))
     
-    # Save the FreeCAD document so parts can be toggled in the GUI
-    doc.recompute()
-    doc.saveAs(os.path.join(CURRENT_DIR, "assembly.FCStd"))
-    print(f"Exported parts, assembly, and assembly.FCStd to {EXPORT_BASE}")
+    # STL requires shapes, so we create a compound of them
+    assembly_compound = Part.makeCompound([bin_body, ring, lid])
+    assembly_compound.exportStl(os.path.join(EXPORT_BASE, "assembly.stl"))
+    
+    print(f"Exported parts, assembly.step, and assembly.stl to {EXPORT_BASE}")
 
 if __name__ == "__main__" or __name__ == "assembly":
     main()
