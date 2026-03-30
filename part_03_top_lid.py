@@ -39,16 +39,14 @@ def create_rounded_box(width, length, height, radius):
     return prism
 
 def construct_lid():
-    # To keep the ultimate outer bounds of the lid flush with the outer dimensions of the bin
-    # while changing the corner radius natively, we must recalculate the core straight dimensions.
-    total_w = config.WIDTH_TOP + 2 * config.CORNER_RADIUS - config.LID_TOLERANCE
-    total_l = config.LENGTH_TOP + 2 * config.CORNER_RADIUS - config.LID_TOLERANCE
+    # To keep the lid exactly flush with the bin walls, we use the same core straight dimensions
+    # and identical corner radius. A tighter corner radius on the same bounding box would cause
+    # the squarer corners of the lid to stick out past the softer corners of the bin.
+    outer_w = config.WIDTH_TOP
+    outer_l = config.LENGTH_TOP
     
-    outer_w = total_w - 2 * config.LID_CORNER_RADIUS
-    outer_l = total_l - 2 * config.LID_CORNER_RADIUS
-    
-    # Base weighted lid part
-    lid = create_rounded_box(outer_w, outer_l, config.LID_THICKNESS, max(0.1, config.LID_CORNER_RADIUS))
+    # Base weighted lid part uses the exact same CORNER_RADIUS as the bin body
+    lid = create_rounded_box(outer_w, outer_l, config.LID_THICKNESS, max(0.1, config.CORNER_RADIUS))
     
     # Stylish Modern Handle
     # A wide, gently sloped front lip that provides a large, easy-to-grab under-surface
@@ -77,7 +75,8 @@ def construct_lid():
         pass
 
     # Position handle at the correct location on the lid
-    handle.translate(App.Vector(0, -total_l/2 + 2.0*config.SCALE, config.LID_THICKNESS))
+    handle_y_pos = -(config.LENGTH_TOP/2 + config.CORNER_RADIUS) + 2.0*config.SCALE
+    handle.translate(App.Vector(0, handle_y_pos, config.LID_THICKNESS))
     
     lid = lid.fuse(handle)
     
@@ -129,7 +128,7 @@ def construct_lid():
         return loft.fuse([cyl, pin])
 
     h_width = 79.0 * config.SCALE
-    h_start = (total_l / 2.0) - 2.0 * config.SCALE
+    h_start = (config.LENGTH_TOP / 2.0) + config.CORNER_RADIUS - 2.0 * config.SCALE
     h_center = (config.LENGTH_TOP / 2.0) + config.CORNER_RADIUS + 18.0 * config.SCALE
     
     lid_hinge = make_lid_hinge(h_width, h_start, h_center)
