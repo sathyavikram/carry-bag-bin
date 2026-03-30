@@ -1,0 +1,30 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+env.bak/
+venv.bak/
+
+# FreeCAD specific
+*.FCStd1
+*.FCStd2
+*.FCBak
+*.BRep
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Ide specific
+.vscode/
+
+# Don't ignore the exports folder completely, but maybe ignore intermediate stls if you don't want them tracked
+# Just allowing exports/ for now but you can configure it
+exports/
