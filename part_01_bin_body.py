@@ -250,6 +250,15 @@ def construct_bin_body():
     front_snap.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
     front_snap.translate(App.Vector(-catch_w/2.0, -bin_inner_y_top + 0.5*config.SCALE, ring_top_z))
     bin_shell = bin_shell.fuse(front_snap)
+    
+    # 5.8 Lower Support Bar for Compression Ring Tab
+    # This acts as a hard stop underneath the front tab to prevent it from being pushed too far down
+    support_w = 40.0 * config.SCALE
+    support_depth = 5.0 * config.SCALE
+    support_h = 3.0 * config.SCALE
+    bottom_support = Part.makeBox(support_w, support_depth, support_h)
+    bottom_support.translate(App.Vector(-support_w/2.0, -bin_inner_y_top, ring_z_pos - support_h))
+    bin_shell = bin_shell.fuse(bottom_support)
 
     # 6. Fillets to remove sharp edges
     try:
