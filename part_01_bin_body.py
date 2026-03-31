@@ -60,15 +60,104 @@ def construct_bin_body():
     # Shift inner solid up by Wall Thickness to ensure solid bottom
     inner_solid.translate(App.Vector(0, 0, config.WALL_THICKNESS))
     
-    # Basic hollow shell
-    bin_shell = outer_solid.cut(inner_solid)
-    
-    # Calculate dimensions at specific heights for accurate cutting/sizing
     def get_dims_at_z(z):
         factor = z / config.BIN_HEIGHT
         w = config.WIDTH_BOTTOM + (config.WIDTH_TOP - config.WIDTH_BOTTOM) * factor
         l = config.LENGTH_BOTTOM + (config.LENGTH_TOP - config.LENGTH_BOTTOM) * factor
         return w, l
+
+    # === Add Modern Styling (Horizontal Groove and Vertical Soft Ribs) ===
+    # 1. Horizontal Groove
+    h_groove_z = config.BIN_HEIGHT * 0.75  # 3/4 way up
+    h_groove_h = 4.0 * config.SCALE
+    h_groove_depth = 1.0 * config.SCALE
+    
+    in_w_b, in_l_b = get_dims_at_z(h_groove_z - h_groove_h/2)
+    in_w_t, in_l_t = get_dims_at_z(h_groove_z + h_groove_h/2)
+    
+    gv_in_w_b = in_w_b - 2*h_groove_depth
+    gv_in_l_b = in_l_b - 2*h_groove_depth
+    gv_in_w_t = in_w_t - 2*h_groove_depth
+    gv_in_l_t = in_l_t - 2*h_groove_depth
+    gv_rad = max(0.1, config.CORNER_RADIUS - h_groove_depth)
+    
+    gv_inner = create_tapered_box(gv_in_w_t, gv_in_l_t, gv_in_w_b, gv_in_l_b, h_groove_h, gv_rad)
+    gv_inner.translate(App.Vector(0, 0, h_groove_z - h_groove_h/2))
+    
+    gv_out_w = config.WIDTH_TOP + 20
+    gv_out_l = config.LENGTH_TOP + 20
+    gv_outer = Part.makeBox(gv_out_w, gv_out_l, h_groove_h)
+    gv_outer.translate(App.Vector(-gv_out_w/2, -gv_out_l/2, h_groove_z - h_groove_h/2))
+    
+    gv_cutter = gv_outer.cut(gv_inner)
+    outer_solid = outer_solid.cut(gv_cutter)
+    
+    # 2. Giraffe Engraving (Front Face)
+    # A single continuous, perfectly bounded silhouette of a giraffe
+    giraffe_2d = [
+        # Front Leg (outer)
+        (5, 0), (10, 0), (9, 20), (12, 35), (15, 45), (18, 55),
+        # Chest & Neck
+        (23, 70), (28, 90), (33, 120), (37, 150), 
+        # Throat & Muzzle
+        (40, 165), (46, 170), (53, 172), (56, 176), (54, 180), (48, 182), (40, 183),
+        # Forehead & Horns
+        (38, 188), (38, 196), (35, 198), (33, 190), 
+        # Ears & Back of Head
+        (28, 195), (25, 185), (23, 170), 
+        # Back Neck & Back
+        (18, 140), (12, 110), (0, 95), (-12, 90), (-25, 86), (-35, 80), (-42, 75),
+        # Tail / Rump
+        (-46, 60), (-49, 45), (-45, 45), (-43, 55), 
+        # Back Leg (outer) down
+        (-44, 40), (-48, 20), (-47, 5), (-45, 0), 
+        # Back Hoof
+        (-39, 0), 
+        # Back Leg (inner)
+        (-39, 15), (-35, 35), (-28, 55), (-22, 65),
+        # Belly
+        (-10, 68), (0, 68), (5, 65),
+        # Inside Front Leg
+        (5, 45), (3, 25), (6, 10)
+    ]
+    
+    g_pts_3d = []
+    # User requested it to cover the full face top to bottom
+    max_g_z = 198.0  
+    target_height = config.BIN_HEIGHT - 10.0
+    g_sf = target_height / max_g_z
+    g_z_offset = 5.0 
+
+    
+    for (xg, zg) in giraffe_2d:
+        xg_s = xg * g_sf
+        zg_s = zg * g_sf
+        
+        z_3d = g_z_offset + zg_s
+        y_b = -(config.LENGTH_BOTTOM / 2.0 + config.CORNER_RADIUS)
+        y_t = -(config.LENGTH_TOP / 2.0 + config.CORNER_RADIUS)
+        dy_dz = (y_t - y_b) / config.BIN_HEIGHT
+        
+        y_surf = y_b + dy_dz * z_3d
+        
+        # Start the shape 2mm OUTSIDE the bin wall
+        y_start = y_surf - 2.0 * config.SCALE
+        g_pts_3d.append(App.Vector(xg_s, y_start, z_3d))
+        
+    # Close the loop
+    g_pts_3d.append(g_pts_3d[0])
+    
+    try:
+        g_face = Part.Face(Part.makePolygon(g_pts_3d))
+        # Extrude strictly backwards in the +Y direction by 3mm
+        # (Since it starts -2mm outside the surface, a +3mm extrusion cuts 1mm deep into the 3mm thick wall)
+        g_cutter = g_face.extrude(App.Vector(0, 3.0 * config.SCALE, 0))
+        outer_solid = outer_solid.cut(g_cutter)
+    except Exception as e:
+        print("Warning: Failed to create giraffe engraving:", e)
+    
+    # Basic hollow shell
+    bin_shell = outer_solid.cut(inner_solid)
 
     # 5. Liquid Trap (Add inside at bottom)
     trap_outer_w = inner_width_b + 5.0 * config.SCALE
