@@ -100,14 +100,14 @@ def construct_lid():
     
     # Hinge mechanism
     def make_lid_hinge(width, y_start, y_center):
-        z_drop = -6.0 * config.SCALE
+        z_drop = -6.0 * config.SCALE # Needs to match global Z=235 when lid is assembled at Z=241
         p1 = App.Vector(-width/2, y_start, 0)
         p2 = App.Vector(width/2, y_start, 0)
         p3 = App.Vector(width/2, y_start, config.LID_THICKNESS)
         p4 = App.Vector(-width/2, y_start, config.LID_THICKNESS)
         f_start = Part.Face(Part.makePolygon([p1, p2, p3, p4, p1]))
         
-        cyl_r = 5.0 * config.SCALE
+        cyl_r = 7.0 * config.SCALE # 14mm diameter outer knuckle
         p1e = App.Vector(-width/2, y_center, z_drop - cyl_r)
         p2e = App.Vector(width/2, y_center, z_drop - cyl_r)
         p3e = App.Vector(width/2, y_center, z_drop + cyl_r)
@@ -120,12 +120,14 @@ def construct_lid():
         cyl.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
         cyl.translate(App.Vector(-width/2, y_center, z_drop))
         
-        pin_width = width + 10.0 * config.SCALE
-        pin = Part.makeCylinder(config.HINGE_PIN_RADIUS, pin_width)
-        pin.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
-        pin.translate(App.Vector(-pin_width/2, y_center, z_drop))
+        # Heavy-duty through-hole for a 9mm 3D printed assembled pin
+        # 4.8mm radius gives a 9.6mm diameter hole, giving perfect clearance.
+        hole_radius = 4.8 * config.SCALE
+        hole = Part.makeCylinder(hole_radius, width + 5.0)
+        hole.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
+        hole.translate(App.Vector(-width/2 - 2.5, y_center, z_drop))
         
-        return loft.fuse([cyl, pin])
+        return loft.fuse(cyl).cut(hole)
 
     h_width = 79.0 * config.SCALE
     h_start = (config.LENGTH_TOP / 2.0) + config.CORNER_RADIUS - 2.0 * config.SCALE
