@@ -18,7 +18,7 @@ EXPORT_STEP = os.path.join(EXPORT_BASE, "part_05_hinge_pin_female.step")
 EXPORT_STL = os.path.join(EXPORT_BASE, "part_05_hinge_pin_female.stl")
 
 def construct_hinge_pin_female():
-    shaft_length = 51.0 * config.SCALE
+    shaft_length = 10.0 * config.SCALE
     shaft_radius = 4.5 * config.SCALE  # Increased to 4.5 (9mm diameter)
     
     # Shaft
@@ -36,50 +36,19 @@ def construct_hinge_pin_female():
     
     female_pin = shaft.fuse(head)
     
-    # Internal Thread Cutter (Clearance added!)
-    # Bore length 14mm to fit 12mm thread + 1.5mm tip + slight extra
-    bore_depth = 15.0 * config.SCALE
-    pitch = 3.0 * config.SCALE
+    # Female Glue Bore (Replaces Thread)
+    # Bore length 10mm to fit 8.5mm peg with some room at bottom
+    bore_depth = 10.0 * config.SCALE
     
-    # Female minor is male minor + clearance
-    # Male minor is 2.5, Female minor 2.8 (0.3 radial clearance)
-    f_minor = 2.8 * config.SCALE
-    # Female major is male major + clearance
-    # Male major is 3.5, Female major 3.8 (0.3 radial clearance)
-    f_major = 3.8 * config.SCALE
+    # Peg radius is 2.6mm, bore radius 2.8mm (0.2mm radial clearance = 0.4mm total diameter clearance)
+    bore_radius = 2.8 * config.SCALE
     
-    # The center bore cylinder to cut out the inside, radius f_minor
-    bore = Part.makeCylinder(f_minor, bore_depth)
+    # The center bore cylinder to cut out the inside
+    bore = Part.makeCylinder(bore_radius, bore_depth)
     bore.translate(App.Vector(0, 0, shaft_length - bore_depth))
     
     female_pin = female_pin.cut(bore)
-    
-    # Cut out the threads from the inside walls
-    # We sweep a thread profile with f_minor -> f_major
-    # Thread helix needs to align with male thread!
-    # Pitch is the same, 3.0
-    helix = Part.makeHelix(pitch, bore_depth, f_minor)
-    
-    # Give the thread a little extra width for horizontal clearance
-    # Male width was pitch*0.4 = 1.2
-    # Let's make female cut width 1.8mm (so 0.3mm wide clearance on each side of the thread teeth)
-    w = pitch * 0.6
-    h = f_major - f_minor
-    # The cut profile extends from inside the bore out to f_major+0.2 to ensure a clean cutout
-    prof_pts = [
-        App.Vector(f_minor - 0.2, 0.0, -w/2),
-        App.Vector(f_major + 0.2, 0.0, -w/2 + w*0.1),
-        App.Vector(f_major + 0.2, 0.0, w/2 - w*0.1),
-        App.Vector(f_minor - 0.2, 0.0, w/2),
-        App.Vector(f_minor - 0.2, 0.0, -w/2)
-    ]
-    prof = Part.makePolygon(prof_pts)
-    
-    wire = Part.Wire(helix)
-    thread_cut = wire.makePipeShell([prof], True, True)
-    thread_cut.translate(App.Vector(0, 0, shaft_length - bore_depth))
-    
-    female_pin = female_pin.cut(thread_cut)
+    female_pin = female_pin.removeSplitter()
     
     # Rotate to lay flat for printing
     female_pin.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)

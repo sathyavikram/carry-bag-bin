@@ -41,7 +41,7 @@ def main():
     female_pin = get_part_shape(construct_hinge_pin_female, "part_05_hinge_pin_female.step")
     
     # Position ring near the top
-    ring.translate(App.Vector(0, 0, config.BIN_HEIGHT - 35 * config.SCALE))
+    ring.translate(App.Vector(0, 0, config.BIN_HEIGHT - (config.RING_HEIGHT + 2.0 * config.SCALE)))
     
     # Position lid on top
     lid.translate(App.Vector(0, 0, config.BIN_HEIGHT + 1.0 * config.SCALE))
@@ -51,14 +51,18 @@ def main():
     h_z = config.BIN_HEIGHT + 1.0 * config.SCALE - 6.0 * config.SCALE
     
     # Position Male Pin
-    male_pin.translate(App.Vector(-3.0 * config.SCALE, 0, -4.0 * config.SCALE))
-    # Pivot 180 to enter from right side facing inwards (now points -X)
+    # The pin export puts the outer face of the head at X=0 and points +X.
+    # The shaft axis is at Z = 4.5
+    male_pin.translate(App.Vector(0, 0, -4.5 * config.SCALE))
+    # Pivot 180 to enter from right side facing inwards (now points -X, inner head surface is at X = -3)
     male_pin.rotate(App.Vector(0,0,0), App.Vector(0,0,1), 180)
-    male_pin.translate(App.Vector(42.5 * config.SCALE, h_y, h_z))
+    male_pin.translate(App.Vector(53.0 * config.SCALE, h_y, h_z))
     
     # Position Female Pin
-    female_pin.translate(App.Vector(-3.0 * config.SCALE, 0, -4.0 * config.SCALE))
-    female_pin.translate(App.Vector(-42.5 * config.SCALE, h_y, h_z))
+    # The female pin also has outer head face at X=0, points +X. Inner head surface is at X = 3
+    # It will enter from the left side pointing +X
+    female_pin.translate(App.Vector(0, 0, -4.5 * config.SCALE))
+    female_pin.translate(App.Vector(-53.0 * config.SCALE, h_y, h_z))
     
     body1 = doc.addObject('App::Part', 'Part_Bin')
     p1 = doc.addObject("Part::Feature", "Shape_Bin")

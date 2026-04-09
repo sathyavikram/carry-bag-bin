@@ -205,65 +205,60 @@ def construct_bin_body():
     
     bin_shell = bin_shell.fuse([k1, k2])
 
-    # 5.6 Inner Hooks for Compression Ring
-    ring_z_pos = config.BIN_HEIGHT - 25.0 * config.SCALE
-    factor_z = ring_z_pos / config.BIN_HEIGHT
+    # 5.6 Corner Support Bumps for Compression Ring
+    ring_bottom_z = config.BIN_HEIGHT - (config.RING_HEIGHT + 2.0 * config.SCALE)
+    factor_z = ring_bottom_z / config.BIN_HEIGHT
     
     bin_w_at_z = config.WIDTH_BOTTOM + (config.WIDTH_TOP - config.WIDTH_BOTTOM) * factor_z
     bin_l_at_z = config.LENGTH_BOTTOM + (config.LENGTH_TOP - config.LENGTH_BOTTOM) * factor_z
     
-    available_w = bin_w_at_z - 2*config.WALL_THICKNESS
-    available_l = bin_l_at_z - 2*config.WALL_THICKNESS
+    # Inner chamfer radius
+    inner_rad = max(0.1, config.CORNER_RADIUS - config.WALL_THICKNESS)
     
-    ring_w_outer = available_w - config.RING_TOLERANCE
-    ring_l_outer = available_l - config.RING_TOLERANCE
-    ring_l_inner = ring_l_outer - 2*config.WALL_THICKNESS
-
-    outer_rad = max(0.1, config.CORNER_RADIUS-config.WALL_THICKNESS)
-    inner_rad = max(0.1, config.CORNER_RADIUS-2*config.WALL_THICKNESS)
-
-    y_max_out = ring_l_outer / 2.0 + outer_rad
-    y_max_in = ring_l_inner / 2.0 + inner_rad
-    rear_y_center = (y_max_out + y_max_in) / 2.0
-
-    bin_inner_y = available_l / 2.0 + outer_rad
-
-    block_w = 20.0 * config.SCALE
-    block = Part.makeBox(block_w, bin_inner_y - (rear_y_center - 3.5*config.SCALE) + 2.0*config.SCALE, 15.0*config.SCALE)
-    block.translate(App.Vector(-block_w/2.0, rear_y_center - 3.5*config.SCALE, ring_z_pos - 10.0*config.SCALE))
-
-    hole = Part.makeCylinder(3.0 * config.SCALE, block_w + 10.0*config.SCALE)
-    hole.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
-    hole.translate(App.Vector(-block_w/2.0 - 5.0*config.SCALE, rear_y_center, ring_z_pos))
-
-    slot = Part.makeBox(block_w + 10.0*config.SCALE, 6.0*config.SCALE, 15.0*config.SCALE)
-    slot.translate(App.Vector(-block_w/2.0 - 5.0*config.SCALE, rear_y_center - 3.0*config.SCALE, ring_z_pos))
-
-    hook = block.cut(hole).cut(slot)
-    bin_shell = bin_shell.fuse(hook)
-
-    # 5.7 Front Snap Catch for Compression Ring
-    ring_top_z = ring_z_pos + 10.0 * config.SCALE
-    factor_z_top = ring_top_z / config.BIN_HEIGHT
-    bin_l_at_z_top = config.LENGTH_BOTTOM + (config.LENGTH_TOP - config.LENGTH_BOTTOM) * factor_z_top
-    available_l_top = bin_l_at_z_top - 2*config.WALL_THICKNESS
-    bin_inner_y_top = available_l_top / 2.0 + outer_rad
-
-    catch_w = 40.0 * config.SCALE
-    catch_r = 1.5 * config.SCALE
-    front_snap = Part.makeCylinder(catch_r, catch_w)
-    front_snap.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
-    front_snap.translate(App.Vector(-catch_w/2.0, -bin_inner_y_top + 0.5*config.SCALE, ring_top_z))
-    bin_shell = bin_shell.fuse(front_snap)
+    # Calculate the exact X and Y coordinates for the inside faces of the straight walls
+    # Based on create_tapered_box math: w2 = w/2 + r. 
+    # Note: bin_w_at_z is exactly the width parameter used for the taper box.
+    w2_inner = bin_w_at_z / 2.0 + inner_rad
+    l2_inner = bin_l_at_z / 2.0 + inner_rad
     
-    # 5.8 Lower Support Bar for Compression Ring Tab
-    # This acts as a hard stop underneath the front tab to prevent it from being pushed too far down
-    support_w = 40.0 * config.SCALE
-    support_depth = 5.0 * config.SCALE
-    support_h = 3.0 * config.SCALE
-    bottom_support = Part.makeBox(support_w, support_depth, support_h)
-    bottom_support.translate(App.Vector(-support_w/2.0, -bin_inner_y_top, ring_z_pos - support_h))
-    bin_shell = bin_shell.fuse(bottom_support)
+    # We want a 4mm ledge sticking out from the wall.
+    # So we use a 5mm wide bar, and embed it 1mm into the wall.
+    bar_wid = 5.0 * config.SCALE 
+    bar_h = 5.0 * config.SCALE
+    
+    # Penetrate into the wall by 1mm so it doesn't pop out through the 1.5mm thin fluted sections
+    perp_shift = 1.0 * config.SCALE
+    
+    # Increase the length to provide a sturdy center surface
+    bar_len = 30.0 * config.SCALE 
+    
+    bumps = []
+    
+    # Right wall (+X)
+    bar1 = Part.makeBox(bar_wid, bar_len, bar_h)
+    bar1.translate(App.Vector(-bar_wid/2.0, -bar_len/2.0, 0))
+    bar1.translate(App.Vector(w2_inner + perp_shift - bar_wid/2.0, 0, ring_bottom_z - bar_h))
+    bumps.append(bar1)
+
+    # Left wall (-X)
+    bar2 = Part.makeBox(bar_wid, bar_len, bar_h)
+    bar2.translate(App.Vector(-bar_wid/2.0, -bar_len/2.0, 0))
+    bar2.translate(App.Vector(-(w2_inner + perp_shift - bar_wid/2.0), 0, ring_bottom_z - bar_h))
+    bumps.append(bar2)
+
+    # Top wall (+Y)
+    bar3 = Part.makeBox(bar_len, bar_wid, bar_h)
+    bar3.translate(App.Vector(-bar_len/2.0, -bar_wid/2.0, 0))
+    bar3.translate(App.Vector(0, l2_inner + perp_shift - bar_wid/2.0, ring_bottom_z - bar_h))
+    bumps.append(bar3)
+
+    # Bottom wall (-Y)
+    bar4 = Part.makeBox(bar_len, bar_wid, bar_h)
+    bar4.translate(App.Vector(-bar_len/2.0, -bar_wid/2.0, 0))
+    bar4.translate(App.Vector(0, -(l2_inner + perp_shift - bar_wid/2.0), ring_bottom_z - bar_h))
+    bumps.append(bar4)
+            
+    bin_shell = bin_shell.fuse(bumps)
 
     # The filleting logic is disabled to save compute resources on the 
     # massive boolean intersection graph of our new material-saving cutouts.

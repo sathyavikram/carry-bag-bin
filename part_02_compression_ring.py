@@ -40,7 +40,7 @@ def create_rounded_box(width, length, height, radius):
 
 def construct_compression_ring():
     # Calculate dimensions at the installation height
-    ring_z_pos = config.BIN_HEIGHT - 25.0 * config.SCALE
+    ring_z_pos = config.BIN_HEIGHT - (config.RING_HEIGHT + 2.0 * config.SCALE)
     factor = ring_z_pos / config.BIN_HEIGHT
     
     # Outer width/length of the BIN at this height
@@ -48,47 +48,29 @@ def construct_compression_ring():
     bin_l_at_z = config.LENGTH_BOTTOM + (config.LENGTH_TOP - config.LENGTH_BOTTOM) * factor
     
     # Inner width/length of the BIN at this height (the available space)
-    available_w = bin_w_at_z - 2*config.WALL_THICKNESS
-    available_l = bin_l_at_z - 2*config.WALL_THICKNESS
+    # The bin interior is defined exactly by bin_w_at_z and the inner_rad
+    available_w = bin_w_at_z
+    available_l = bin_l_at_z
     
     # Ring dimensions (fitting inside with tolerance)
     ring_w_outer = available_w - config.RING_TOLERANCE
     ring_l_outer = available_l - config.RING_TOLERANCE
-    ring_w_inner = ring_w_outer - 2*config.WALL_THICKNESS
-    ring_l_inner = ring_l_outer - 2*config.WALL_THICKNESS
-
-    outer_rad = max(0.1, config.CORNER_RADIUS-config.WALL_THICKNESS)
+    
+    # To maintain the same wall thickness natively inside the ring, 
+    # we keep the w/l base parameters identical and let the radius subtraction
+    # define the 3mm thickness exactly like the main bin shell!
+    ring_w_inner = ring_w_outer
+    ring_l_inner = ring_l_outer
+    
+    outer_rad = max(0.1, config.CORNER_RADIUS - config.WALL_THICKNESS - config.RING_TOLERANCE/2)
     outer_solid = create_rounded_box(ring_w_outer, ring_l_outer, config.RING_HEIGHT, outer_rad)
-    inner_rad = max(0.1, config.CORNER_RADIUS-2*config.WALL_THICKNESS)
-    inner_solid = create_rounded_box(ring_w_inner, ring_l_inner, config.RING_HEIGHT, inner_rad)
+    
+    inner_rad = max(0.1, outer_rad - config.WALL_THICKNESS) 
+    # Make cutter 2.0mm taller to fully pierce top and bottom face (prevents non-manifold edges)
+    inner_solid = create_rounded_box(ring_w_inner, ring_l_inner, config.RING_HEIGHT + 2.0, inner_rad)
+    inner_solid.translate(App.Vector(0, 0, -1.0))
     
     ring = outer_solid.cut(inner_solid)
-    
-    # --- Add hinge pin for snapping the ring to the bin ---
-    y_max_out = ring_l_outer / 2.0 + outer_rad
-    y_max_in = ring_l_inner / 2.0 + inner_rad
-    rear_y_center = (y_max_out + y_max_in) / 2.0
-
-    notch_w = 40.0 * config.SCALE
-    notch = Part.makeBox(notch_w, 30.0 * config.SCALE, config.RING_HEIGHT + 10)
-    notch.translate(App.Vector(-notch_w/2, rear_y_center - 10.0 * config.SCALE, -5))
-    ring = ring.cut(notch)
-    
-    pin_radius = 2.5 * config.SCALE
-    pin = Part.makeCylinder(pin_radius, notch_w)
-    pin.rotate(App.Vector(0,0,0), App.Vector(0,1,0), 90)
-    pin.translate(App.Vector(-notch_w/2, rear_y_center, config.RING_HEIGHT / 2.0))
-    
-    ring = ring.fuse(pin)
-    
-    # --- Add front thumb tab for easy snapping ---
-    front_y_center = -rear_y_center
-    tab_w = 40.0 * config.SCALE
-    tab_l = 15.0 * config.SCALE
-    tab = Part.makeBox(tab_w, tab_l, config.RING_HEIGHT)
-    tab.translate(App.Vector(-tab_w/2, front_y_center, 0))
-    ring = ring.fuse(tab)
-    # -----------------------------------------------------
 
     try:
         edges_to_fillet = []
@@ -101,7 +83,9 @@ def construct_compression_ring():
                     edges_to_fillet.append(edge)
         
         if edges_to_fillet:
-            ring = ring.makeFillet(config.EDGE_FILLET_RADIUS * 0.7, edges_to_fillet)
+            # Max safe fillet is (WALL_THICKNESS / 2) minus a small margin to prevent overlapping geometry which causes non-manifold edges.
+            safe_fillet_radius = (config.WALL_THICKNESS / 2.0) * 0.8
+            ring = ring.makeFillet(safe_fillet_radius, edges_to_fillet)
     except Exception as e:
         print("Warning: Filleting compression_ring failed:", e)
         
