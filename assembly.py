@@ -44,11 +44,11 @@ def main():
     ring.translate(App.Vector(0, 0, config.BIN_HEIGHT - (config.RING_HEIGHT + 2.0 * config.SCALE)))
     
     # Position lid on top
-    lid.translate(App.Vector(0, 0, config.BIN_HEIGHT + 1.0 * config.SCALE))
+    lid.translate(App.Vector(0, 0, config.BIN_HEIGHT + 0.0 * config.SCALE))
     
     # Center lines for hinges
     h_y = (config.LENGTH_TOP / 2.0) + config.CORNER_RADIUS + 18.0 * config.SCALE
-    h_z = config.BIN_HEIGHT + 1.0 * config.SCALE - 6.0 * config.SCALE
+    h_z = config.BIN_HEIGHT - 7.0 * config.SCALE
     
     # Position Male Pin
     # The pin export puts the outer face of the head at X=0 and points +X.

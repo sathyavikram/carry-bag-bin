@@ -197,7 +197,7 @@ def construct_bin_body():
 
     k1 = make_bin_knuckle(4.8 * config.SCALE) # 4.8 radius = 9.6mm diameter for 9mm pin clearance
     y_pos = (config.LENGTH_TOP / 2.0) + config.CORNER_RADIUS - 2.0 * config.SCALE
-    z_pos = config.BIN_HEIGHT - 12.0 * config.SCALE # adjusted for taller 14mm knuckle (used to be 10)
+    z_pos = config.BIN_HEIGHT - 14.0 * config.SCALE # adjusted to make hinge flush with bin top
     k1.translate(App.Vector(40.0 * config.SCALE, y_pos, z_pos))
     
     k2 = make_bin_knuckle(4.8 * config.SCALE)

@@ -100,7 +100,7 @@ def construct_lid():
     
     # Hinge mechanism
     def make_lid_hinge(width, y_start, y_center):
-        z_drop = -6.0 * config.SCALE # Needs to match global Z=235 when lid is assembled at Z=241
+        z_drop = -7.0 * config.SCALE # Needs to match global Z=233 (Bin height 240 - 7)
         p1 = App.Vector(-width/2, y_start, 0)
         p2 = App.Vector(width/2, y_start, 0)
         p3 = App.Vector(width/2, y_start, config.LID_THICKNESS)
